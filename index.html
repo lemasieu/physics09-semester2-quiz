@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trắc nghiệm Vật lý 9 - Học kỳ 2</title>
+    <!-- Tailwind CSS (CDN) cho bố cục -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Tệp CSS tùy chỉnh -->
+    <link rel="stylesheet" href="style.css">
+    <!-- MathJax để hiển thị công thức Toán/Lý -->
+    <script>
+        window.MathJax = {
+            tex: {
+                inlineMath: [['$', '$'], ['\\(', '\\)']],
+                displayMath: [['$$', '$$'], ['\\[', '\\]']]
+            }
+        };
+    </script>
+    <script type="text/javascript" id="MathJax-script" async
+        src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js">
+    </script>
+</head>
+<body>
+    <div id="app" class="min-h-screen flex flex-col items-center p-4">
+        <!-- Header -->
+        <header class="w-full max-w-4xl bg-blue-600 text-white rounded-xl shadow-lg p-6 mb-6 text-center">
+            <h1 class="text-3xl font-bold uppercase tracking-wide">Trắc Nghiệm Lý 9 HK2</h1>
+        </header>
+
+        <!-- Main Content -->
+        <main id="main-content" class="w-full max-w-4xl bg-black rounded-2xl shadow-xl p-8 transition-all relative">
+            <!-- Loading indicator -->
+            <div id="loading" class="text-center text-white py-10">Đang tải dữ liệu...</div>
+
+            <!-- Setup Screen -->
+            <div id="setup-screen" class="hidden">
+                <h2 class="text-xl font-semibold mb-4 text-white">Cài đặt bài thi</h2>
+                <div class="space-y-6">
+                    <div>
+                        <label class="block text-sm font-medium text-white mb-2">Chọn nội dung:</label>
+                        <select id="lesson-select" class="w-full bg-black p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+                            <option value="all">Ôn tập tổng hợp (Tất cả các bài)</option>
+                            <option value="1">Điện trở. Định luật Ohm</option>
+                            <option value="2">Đoạn mạch nối tiếp, song song</option>
+                            <option value="3">Năng lượng của dòng điện và công suất điện</option>
+                            <option value="4">Cảm ứng điện từ. Nguyên tắc tạo ra dòng điện xoay chiều</option>
+                            <option value="5">Tác dụng của dòng điện xoay chiều</option>
+                            <option value="6">Vòng năng lượng trên Trái Đất. Năng lượng hoá thạch</option>
+                            <option value="7">Một số dạng năng lượng tái tạo</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-white mb-2">Chọn mức độ:</label>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <button onclick="startQuiz('easy')" class="p-4 bg-green-50 text-green-700 border-2 border-green-200 rounded-xl hover:bg-green-100 transition flex flex-col items-center">
+                                <span class="font-bold text-lg">Dễ</span>
+                                <span class="text-xs">(Nhận biết + Thông hiểu)</span>
+                            </button>
+                            <button onclick="startQuiz('medium')" class="p-4 bg-yellow-50 text-yellow-700 border-2 border-yellow-200 rounded-xl hover:bg-yellow-100 transition flex flex-col items-center">
+                                <span class="font-bold text-lg">Trung bình</span>
+                                <span class="text-xs">(Nhận biết + Thông hiểu + Vận dụng)</span>
+                            </button>
+                            <button onclick="startQuiz('hard')" class="p-4 bg-red-50 text-red-700 border-2 border-red-200 rounded-xl hover:bg-red-100 transition flex flex-col items-center">
+                                <span class="font-bold text-lg">Khó</span>
+                                <span class="text-xs">(Thông hiểu + Vận dụng + Vận dụng cao)</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quiz Screen -->
+            <div id="quiz-screen" class="hidden">
+                <div class="flex justify-between items-center mb-6 border-b pb-4">
+                    <span id="quiz-title" class="font-semibold text-blue-600 text-lg"></span>
+                    <span id="progress" class="bg-black px-3 py-1 rounded-full text-sm font-medium"></span>
+                </div>
+
+                <div id="question-container" class="mb-8">
+                    <!-- Ảnh sẽ được chèn tự động vào bên trong thẻ div này nếu có -->
+                    <div id="question-content" class="text-xl text-white leading-relaxed mb-6 font-medium"></div>
+                    <div id="options" class="grid grid-cols-1 gap-3"></div>
+                </div>
+
+                <div id="feedback" class="hidden p-4 rounded-lg mb-6"></div>
+
+                <div class="flex justify-between items-center">
+                    <button id="next-btn" class="bg-blue-600 text-white px-8 py-3 rounded-xl font-bold hover:bg-blue-700 transition shadow-lg hidden">Câu tiếp theo</button>
+                    <button onclick="showSetup()" class="text-gray-400 hover:text-red-500 text-sm underline ml-auto">Thoát</button>
+                </div>
+            </div>
+
+            <!-- Result Screen -->
+            <div id="result-screen" class="hidden text-center">
+                <h2 class="text-3xl font-bold text-white mb-4">Kết quả bài thi</h2>
+                <div class="text-6xl font-bold text-blue-600 mb-6" id="score-text"></div>
+                <p id="performance-comment" class="text-gray-600 mb-8"></p>
+                <button onclick="showSetup()" class="bg-blue-600 text-white px-10 py-4 rounded-xl font-bold hover:bg-blue-700 transition shadow-lg">Làm lại bài khác</button>
+            </div>
+        </main>
+    </div>
+
+    <!-- Tệp JavaScript -->
+    <script src="script.js"></script>
+</body>
+</html>
