@@ -1,0 +1,23 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+
+body {
+    font-family: 'Inter', sans-serif;
+    background-color: #151515;
+    color:azure;
+}
+
+/* Tinh chỉnh cách hiển thị hình ảnh trong câu hỏi */
+.question-image {
+    max-width: 100%;
+    height: auto;
+    max-height: 300px; /* Giới hạn chiều cao để không bị quá to */
+    margin: 1rem auto;
+    border-radius: 0.5rem;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    display: block;
+}
+
+/* Đảm bảo công thức MathJax hiển thị đẹp */
+.math-text {
+    font-family: 'Times New Roman', serif;
+}
