@@ -3,7 +3,7 @@ let currentQuiz = [];
 let currentIndex = 0;
 let score = 0;
 
-// ----- Hàm format số -----
+// ----- Hàm format số cho văn bản thường (dấu phẩy) -----
 function formatNumber(num) {
     if (num === undefined || num === null || isNaN(num)) return num;
     if (Number.isInteger(num) && Math.abs(num) < 1e12) return num.toString();
@@ -11,17 +11,34 @@ function formatNumber(num) {
     return fixed.replace('.', ',');
 }
 
-// Chuyển số rất nhỏ hoặc rất lớn sang dạng LaTeX: 1.1e-6 -> 1,1 \times 10^{-6}
+// ----- Hàm format số cho MathJax (dấu chấm) -----
+function formatNumberMath(num) {
+    if (num === undefined || num === null || isNaN(num)) return num;
+    if (Number.isInteger(num) && Math.abs(num) < 1e12) return num.toString();
+    return parseFloat(num.toFixed(6)).toString();
+}
+
+// ----- Chuyển số sang dạng LaTeX (dùng dấu chấm bên trong) -----
 function formatScientific(num) {
+    if (num === 0) return '0';
+    if (Math.abs(num) >= 1e-3 && Math.abs(num) < 1e6) return formatNumberMath(num);
+    let exp = Math.floor(Math.log10(Math.abs(num)));
+    let mantissa = num / Math.pow(10, exp);
+    mantissa = Math.round(mantissa * 100) / 100;
+    return `${formatNumberMath(mantissa)} \\times 10^{${exp}}`;
+}
+
+// ----- Chuyển số sang dạng hiển thị cho văn bản thường (dấu phẩy, dấu ×) -----
+function formatScientificDisplay(num) {
     if (num === 0) return '0';
     if (Math.abs(num) >= 1e-3 && Math.abs(num) < 1e6) return formatNumber(num);
     let exp = Math.floor(Math.log10(Math.abs(num)));
     let mantissa = num / Math.pow(10, exp);
     mantissa = Math.round(mantissa * 100) / 100;
-    return `${formatNumber(mantissa)} \\times 10^{${exp}}`;
+    return `${formatNumber(mantissa)} × 10${exp < 0 ? '⁻' : '⁺'}${String(Math.abs(exp)).split('').map(d => '⁰¹²³⁴⁵⁶⁷⁸⁹'[parseInt(d)]).join('')}`;
 }
 
-// ----- Hàm tạo đáp án nhiễu (cải tiến triệt để) -----
+// ----- Hàm tạo đáp án nhiễu -----
 function generateDistractors(correctValue, unit, count = 3, contextValues = []) {
     let distractors = [];
     let attempts = 0;
@@ -113,7 +130,6 @@ function generateDistractors(correctValue, unit, count = 3, contextValues = []) 
     return result;
 }
 
-// --- Các hàm helper khác ---
 function randomPick(arr) {
     return arr[Math.floor(Math.random() * arr.length)];
 }
@@ -122,15 +138,15 @@ function randomFromList(list) {
     return list[Math.floor(Math.random() * list.length)];
 }
 
-// ----- Template Handlers (đã sửa để bọc MathJax) -----
+// ----- Template Handlers (đã kiểm tra kỹ lưỡng) -----
 const templateHandlers = {
-    // Q007
     resistanceCopperWire: function() {
         const L = randomFromList([30,40,50,60,70]);
         const S = randomFromList([0.45,0.5,0.55,0.6,0.65]);
         const correct = 1.7e-8 * L / (S * 1e-4);
         const correctDisplay = formatNumber(correct);
-        const text = `Tính điện trở của đoạn dây dẫn bằng đồng nối từ cột điện vào công tơ điện của một gia đình có chiều dài là ${L} m và tiết diện là ${S} cm².`;
+        const correctMath = formatNumberMath(correct);
+        const text = `Tính điện trở của đoạn dây dẫn bằng đồng nối từ cột điện vào công tơ điện của một gia đình có chiều dài là ${L} m và tiết diện là ${formatNumber(S)} cm².`;
         const context = [L, S];
         let options = generateDistractors(correct, 'Ω', 3, context);
         const correctStr = correctDisplay + ' Ω';
@@ -141,10 +157,9 @@ const templateHandlers = {
             text,
             options,
             correct: options.indexOf(correctStr),
-            rationale: `$R = \\rho \\dfrac{\\ell}{S} = 1,7\\times10^{-8} \\cdot \\dfrac{${L}}{${S}\\cdot10^{-4}} = ${correctDisplay}\\ \\Omega$`
+            rationale: `$R = \\rho \\dfrac{\\ell}{S} = 1,7\\times10^{-8} \\cdot \\dfrac{${L}}{${formatNumberMath(S)}\\cdot10^{-4}} = ${correctMath}\\ \\Omega$`
         };
     },
-    // Q008
     resistanceMetalWire: function() {
         const metals = ['bạc','đồng','vàng','nhôm','tungsten','sắt','nikelin','manganin','constantan','nicrom'];
         const rhoMap = {
@@ -158,7 +173,9 @@ const templateHandlers = {
         const S = randomFromList([0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9]);
         const correct = rho * 10000 * L / S;
         const correctDisplay = formatNumber(correct);
-        const text = `Tính điện trở của đoạn dây dẫn làm bằng ${name} có chiều dài ${L*1000*S} cm và tiết diện ${S} mm².`;
+        const correctMath = formatNumberMath(correct);
+        const rhoDisplay = formatScientificDisplay(rho);
+        const text = `Tính điện trở của đoạn dây dẫn làm bằng ${name} có chiều dài ${formatNumber(L*1000*S)} cm và tiết diện ${formatNumber(S)} mm². (Điện trở suất của ${name} là ${rhoDisplay} Ωm)`;
         const context = [rho, L, S];
         let options = generateDistractors(correct, 'Ω', 3, context);
         const correctStr = correctDisplay + ' Ω';
@@ -169,10 +186,9 @@ const templateHandlers = {
             text,
             options,
             correct: options.indexOf(correctStr),
-            rationale: `$\\ell = ${L*1000*S/100}\\text{m}, S=${S}\\cdot10^{-6}\\text{m}^2, R = \\rho\\dfrac{\\ell}{S} = ${correctDisplay}\\ \\Omega$`
+            rationale: `$\\ell = ${formatNumberMath(L*1000*S/100)}\\text{m}, S=${formatNumberMath(S)}\\cdot10^{-6}\\text{m}^2, R = \\rho\\dfrac{\\ell}{S} = ${correctMath}\\ \\Omega$`
         };
     },
-    // Q010
     resistanceRatio: function() {
         const n = randomFromList([2,3,4,5,6,7,8,9,10]);
         const m = randomFromList([2,3,4,5,6,7,8,9]);
@@ -184,15 +200,15 @@ const templateHandlers = {
             `${formatNumber(correct)} lần`,
             `${n*n/(m*m)} lần`
         ];
-        return { text, options, correct: 2, rationale: `$R_1/R_2 = \\dfrac{\\ell_1/S_1}{\\ell_2/S_2} = \\dfrac{${n}\\ell_2}{${m}S_2}\\cdot\\dfrac{S_2}{\\ell_2} = ${formatNumber(correct)}$` };
+        return { text, options, correct: 2, rationale: `$R_1/R_2 = \\dfrac{\\ell_1/S_1}{\\ell_2/S_2} = \\dfrac{${n}\\ell_2}{${m}S_2}\\cdot\\dfrac{S_2}{\\ell_2} = ${formatNumberMath(correct)}$` };
     },
-    // Q011
     cableResistance: function() {
         const n = randomFromList([3,6,12,15]);
         const R = randomFromList([0.3,0.6,0.9,1.2,1.5,1.8,2.1]);
         const correct = R / n;
         const correctDisplay = formatNumber(correct);
-        const text = `Một dây cáp điện bằng đồng có lõi là ${n} sợi dây đồng xoắn lại với nhau. Điện trở của mỗi sợi dây đồng này là ${R} Ω. Tính điện trở của dây cáp điện này.`;
+        const correctMath = formatNumberMath(correct);
+        const text = `Một dây cáp điện bằng đồng có lõi là ${n} sợi dây đồng xoắn lại với nhau. Điện trở của mỗi sợi dây đồng này là ${formatNumber(R)} Ω. Tính điện trở của dây cáp điện này.`;
         const context = [R, n];
         let options = generateDistractors(correct, 'Ω', 3, context);
         const correctStr = correctDisplay + ' Ω';
@@ -203,10 +219,9 @@ const templateHandlers = {
             text,
             options,
             correct: options.indexOf(correctStr),
-            rationale: `$R_{cáp} = \\dfrac{R}{${n}} = ${correctDisplay}\\ \\Omega$`
+            rationale: `$R_{cáp} = \\dfrac{${formatNumberMath(R)}}{${n}} = ${correctMath}\\ \\Omega$`
         };
     },
-    // Q012 - SỬA: bọc formatScientific trong $...$
     rheostatResistance: function() {
         const materials = ['bạc','đồng','vàng','nhôm','tungsten','sắt','nikelin','manganin','constantan','nicrom'];
         const rhoMap = {
@@ -221,8 +236,9 @@ const templateHandlers = {
         const d2 = randomFromList([2,4,6,8,10]);
         const correct = rho * d1 * n * 40000 / (d2 * d2);
         const correctDisplay = formatNumber(correct);
-        const rhoDisplay = formatScientific(rho);
-        const text = `Xác định điện trở của một biến trở làm bằng dây ${name} cuốn thành ${n} vòng quanh một lõi sứ hình trụ. Biết đường kính của trụ sứ bằng ${d1} cm; đường kính của dây bằng ${d2} mm, điện trở suất của ${name} $\\rho = ${rhoDisplay}\\ \\Omega m$.`;
+        const correctMath = formatNumberMath(correct);
+        const rhoDisplay = formatScientificDisplay(rho);
+        const text = `Xác định điện trở của một biến trở làm bằng dây ${name} cuốn thành ${n} vòng quanh một lõi sứ hình trụ. Biết đường kính của trụ sứ bằng ${d1} cm; đường kính của dây bằng ${d2} mm, điện trở suất của ${name} là ${rhoDisplay} Ωm.`;
         const context = [rho, n, d1, d2];
         let options = generateDistractors(correct, 'Ω', 3, context);
         const correctStr = correctDisplay + ' Ω';
@@ -233,10 +249,9 @@ const templateHandlers = {
             text,
             options,
             correct: options.indexOf(correctStr),
-            rationale: `$\\ell = \\pi d_1 n = ${Math.round(3.14*d1*n)}\\text{cm} = ${(3.14*d1*n/100).toFixed(2)}\\text{m}; S = \\pi (d_2/2)^2 = ${(0.785*d2*d2).toFixed(2)}\\text{mm}^2 = ${(0.785*d2*d2*1e-6).toExponential(2)}\\text{m}^2; R = \\rho\\dfrac{\\ell}{S} = ${correctDisplay}\\ \\Omega$`
+            rationale: `$\\ell = \\pi d_1 n = ${Math.round(3.14*d1*n)}\\text{cm} = ${(3.14*d1*n/100).toFixed(2)}\\text{m}; S = \\pi (d_2/2)^2 = ${(0.785*d2*d2).toFixed(2)}\\text{mm}^2 = ${(0.785*d2*d2*1e-6).toExponential(2)}\\text{m}^2; R = \\rho\\dfrac{\\ell}{S} = ${correctMath}\\ \\Omega$`
         };
     },
-    // Q013
     copperWireResistanceMass: function() {
         const S = randomFromList([0.1,0.2,0.4,0.5,0.8]);
         const m = randomFromList([0.1,0.2,0.3,0.4,0.5]);
@@ -244,7 +259,8 @@ const templateHandlers = {
         const rho = 1.7e-8;
         const correct = rho * m * 10 / (D * S * S * 1e-6);
         const correctDisplay = formatNumber(correct);
-        const text = `Một dây đồng có tiết diện là ${S} mm² và khối lượng là ${m} kg. Tính điện trở của dây. Biết điện trở suất của đồng là $1,7 \\times 10^{-8}\\ \\Omega m$, khối lượng riêng của đồng là ${D} g/cm³.`;
+        const correctMath = formatNumberMath(correct);
+        const text = `Một dây đồng có tiết diện là ${formatNumber(S)} mm² và khối lượng là ${formatNumber(m)} kg. Tính điện trở của dây. Biết điện trở suất của đồng là 1,7×10⁻⁸ Ωm, khối lượng riêng của đồng là ${formatNumber(D)} g/cm³.`;
         const context = [m, S];
         let options = generateDistractors(correct, 'Ω', 3, context);
         const correctStr = correctDisplay + ' Ω';
@@ -255,17 +271,17 @@ const templateHandlers = {
             text,
             options,
             correct: options.indexOf(correctStr),
-            rationale: `$\\ell = \\dfrac{m}{D S} = ${(m*10/(D*S/100)).toFixed(2)}\\text{m}, R = \\rho\\dfrac{\\ell}{S} = ${correctDisplay}\\ \\Omega$`
+            rationale: `$\\ell = \\dfrac{${formatNumberMath(m)}}{${D} \\cdot ${formatNumberMath(S)}} = ${(m*10/(D*S/100)).toFixed(2)}\\text{m}, R = \\rho\\dfrac{\\ell}{S} = ${correctMath}\\ \\Omega$`
         };
     },
-    // Q014
     wireLengthChange: function() {
         const d1 = randomFromList([0.3,0.6,0.9,1.2]);
         const l1 = randomFromList([1.44,2.88,4.32,5.76]);
         const d2 = d1 * 2/3;
         const correct = l1 * 4/9;
         const correctDisplay = formatNumber(correct);
-        const text = `Người ta dùng dây nikelin làm dây nung cho một bếp điện. Nếu dùng dây với đường kính tiết diện là ${d1} mm thì dây phải có độ dài là ${l1} m. Hỏi nếu không thay đổi điện trở của dây nung và vẫn dùng loại dây nikelin với đường kính tiết diện là ${d2.toFixed(2)} mm thì dây phải dài bao nhiêu?`;
+        const correctMath = formatNumberMath(correct);
+        const text = `Người ta dùng dây nikelin làm dây nung cho một bếp điện. Nếu dùng dây với đường kính tiết diện là ${formatNumber(d1)} mm thì dây phải có độ dài là ${formatNumber(l1)} m. Hỏi nếu không thay đổi điện trở của dây nung và vẫn dùng loại dây nikelin với đường kính tiết diện là ${formatNumber(d2)} mm thì dây phải dài bao nhiêu?`;
         const context = [l1, d1, d2];
         let options = generateDistractors(correct, 'm', 3, context);
         const correctStr = correctDisplay + ' m';
@@ -276,14 +292,14 @@ const templateHandlers = {
             text,
             options,
             correct: options.indexOf(correctStr),
-            rationale: `$\\ell_2 = \\ell_1\\dfrac{r_2^2}{r_1^2} = ${l1} \\cdot \\dfrac{(${d2/2})^2}{(${d1/2})^2} = ${correctDisplay}\\text{ m}$`
+            rationale: `$\\ell_2 = \\ell_1\\dfrac{r_2^2}{r_1^2} = ${formatNumberMath(l1)} \\cdot \\dfrac{(${d2/2})^2}{(${d1/2})^2} = ${correctMath}\\text{ m}$`
         };
     },
-    // Q015
     currentFromVoltageResistance: function() {
         const R = randomFromList([22,55,88]);
         const correct = 220 / R;
         const correctDisplay = formatNumber(correct);
+        const correctMath = formatNumberMath(correct);
         const text = `Hiệu điện thế giữa hai đầu bàn là điện là 220 V, điện trở của dây nung nóng của bàn là là ${R} Ω. Cường độ dòng điện chạy qua dây nung nóng của bàn là là bao nhiêu?`;
         const context = [R];
         let options = generateDistractors(correct, 'A', 3, context);
@@ -295,16 +311,16 @@ const templateHandlers = {
             text,
             options,
             correct: options.indexOf(correctStr),
-            rationale: `$I = \\dfrac{U}{R} = \\dfrac{220}{${R}} = ${correctDisplay}\\text{ A}$`
+            rationale: `$I = \\dfrac{220}{${R}} = ${correctMath}\\text{ A}$`
         };
     },
-    // Q016
     voltageFromCurrentResistance: function() {
         const I = randomFromList([0.5,0.6,0.7,0.8,0.9]);
         const R = randomFromList([290,300,310,320,330]);
         const correct = I * R;
         const correctDisplay = formatNumber(correct);
-        const text = `Cường độ dòng điện qua dây tóc bóng đèn là ${I} A, điện trở của dây tóc bóng đèn là ${R} Ω. Xác định hiệu điện thế giữa hai đầu bóng đèn.`;
+        const correctMath = formatNumberMath(correct);
+        const text = `Cường độ dòng điện qua dây tóc bóng đèn là ${formatNumber(I)} A, điện trở của dây tóc bóng đèn là ${R} Ω. Xác định hiệu điện thế giữa hai đầu bóng đèn.`;
         const context = [I, R];
         let options = generateDistractors(correct, 'V', 3, context);
         const correctStr = correctDisplay + ' V';
@@ -315,16 +331,16 @@ const templateHandlers = {
             text,
             options,
             correct: options.indexOf(correctStr),
-            rationale: `$U = I\\cdot R = ${I} \\cdot ${R} = ${correctDisplay}\\text{ V}$`
+            rationale: `$U = I\\cdot R = ${formatNumberMath(I)} \\cdot ${R} = ${correctMath}\\text{ V}$`
         };
     },
-    // Q017
     voltmeterResistance: function() {
         const U = randomFromList([100,125,150,175,200]);
         const I = randomFromList([0.01,0.05,0.1,0.5,1]);
         const correct = U / I;
         const correctDisplay = formatNumber(correct);
-        const text = `Một vôn kế có giá trị đo tối đa đến ${U} V. Để dòng điện qua vôn kế không được vượt quá ${I} A thì vôn kế phải có điện trở bằng bao nhiêu?`;
+        const correctMath = formatNumberMath(correct);
+        const text = `Một vôn kế có giá trị đo tối đa đến ${U} V. Để dòng điện qua vôn kế không được vượt quá ${formatNumber(I)} A thì vôn kế phải có điện trở bằng bao nhiêu?`;
         const context = [U, I];
         let options = generateDistractors(correct, 'Ω', 3, context);
         const correctStr = correctDisplay + ' Ω';
@@ -335,10 +351,9 @@ const templateHandlers = {
             text,
             options,
             correct: options.indexOf(correctStr),
-            rationale: `$R \\ge \\dfrac{U}{I} = \\dfrac{${U}}{${I}} = ${correctDisplay}\\ \\Omega$`
+            rationale: `$R \\ge \\dfrac{${U}}{${formatNumberMath(I)}} = ${correctMath}\\ \\Omega$`
         };
     },
-    // Q021
     currentMetalWire: function() {
         const metals = ['bạc','đồng','vàng','nhôm','tungsten','sắt','nikelin','manganin','constantan','nicrom'];
         const rhoMap = {
@@ -353,8 +368,9 @@ const templateHandlers = {
         const R = rho * L / (S * 1e-6);
         const correct = 220 / R;
         const correctDisplay = formatNumber(correct);
-        const rhoDisplay = formatScientific(rho);
-        const text = `Tính cường độ dòng điện chạy trong dây dẫn làm bằng ${name} với chiều dài là ${L} m và tiết diện là ${S} mm², nếu hiệu điện thế giữa hai đầu dây là 220 V. (Điện trở suất của ${name} là $\\rho = ${rhoDisplay}\\ \\Omega m$)`;
+        const correctMath = formatNumberMath(correct);
+        const rhoDisplay = formatScientificDisplay(rho);
+        const text = `Tính cường độ dòng điện chạy trong dây dẫn làm bằng ${name} với chiều dài là ${L} m và tiết diện là ${formatNumber(S)} mm², nếu hiệu điện thế giữa hai đầu dây là 220 V. (Điện trở suất của ${name} là ${rhoDisplay} Ωm)`;
         const context = [rho, L, S];
         let options = generateDistractors(correct, 'A', 3, context);
         const correctStr = correctDisplay + ' A';
@@ -365,16 +381,16 @@ const templateHandlers = {
             text,
             options,
             correct: options.indexOf(correctStr),
-            rationale: `$R = \\rho\\dfrac{\\ell}{S} = ${formatNumber(R)}\\Omega; I = \\dfrac{220}{R} = ${correctDisplay}\\text{ A}$`
+            rationale: `$R = \\rho\\dfrac{\\ell}{S} = ${formatNumberMath(R)}\\Omega; I = \\dfrac{220}{R} = ${correctMath}\\text{ A}$`
         };
     },
-    // Q023
     resistanceFromVoltmeterAmmeter: function() {
         const U = randomFromList([100,120,150,200]);
         const I = randomFromList([0.01,0.02,0.05,0.08]);
         const correct = U / I;
         const correctDisplay = formatNumber(correct);
-        const text = `Một vôn kế đo hiệu điện thế giữa hai đầu một bóng đèn sợi đốt, chỉ ${U} V, còn ampe kế đo cường độ dòng điện qua bóng đèn chỉ ${I} A. Xác định điện trở của bóng đèn.`;
+        const correctMath = formatNumberMath(correct);
+        const text = `Một vôn kế đo hiệu điện thế giữa hai đầu một bóng đèn sợi đốt, chỉ ${U} V, còn ampe kế đo cường độ dòng điện qua bóng đèn chỉ ${formatNumber(I)} A. Xác định điện trở của bóng đèn.`;
         const context = [U, I];
         let options = generateDistractors(correct, 'Ω', 3, context);
         const correctStr = correctDisplay + ' Ω';
@@ -385,10 +401,9 @@ const templateHandlers = {
             text,
             options,
             correct: options.indexOf(correctStr),
-            rationale: `$R = \\dfrac{U}{I} = \\dfrac{${U}}{${I}} = ${correctDisplay}\\ \\Omega$`
+            rationale: `$R = \\dfrac{${U}}{${formatNumberMath(I)}} = ${correctMath}\\ \\Omega$`
         };
     },
-    // Q024 - SỬA: bọc formatScientific trong $...$
     heaterWireLength: function() {
         const S = randomFromList([0.1,0.2,0.5]);
         const I = randomFromList([5,10,20]);
@@ -397,8 +412,9 @@ const templateHandlers = {
         const R = U / I;
         const correct = R * S * 1e-6 / rho;
         const correctDisplay = formatNumber(correct);
-        const rhoDisplay = formatScientific(rho);
-        const text = `Một lò sưởi điện được đốt nóng bằng dây hợp kim có điện trở suất $\\rho = ${rhoDisplay}\\ \\Omega m$, tiết diện dây đốt là ${S} mm². Khi hiệu điện thế giữa hai đầu lò sưởi là 220 V thì cường độ dòng điện qua lò sưởi là ${I} A. Xác định chiều dài của dây đốt.`;
+        const correctMath = formatNumberMath(correct);
+        const rhoDisplay = formatScientificDisplay(rho);
+        const text = `Một lò sưởi điện được đốt nóng bằng dây hợp kim có điện trở suất ${rhoDisplay} Ωm, tiết diện dây đốt là ${formatNumber(S)} mm². Khi hiệu điện thế giữa hai đầu lò sưởi là 220 V thì cường độ dòng điện qua lò sưởi là ${I} A. Xác định chiều dài của dây đốt.`;
         const context = [S, I, rho];
         let options = generateDistractors(correct, 'm', 3, context);
         const correctStr = correctDisplay + ' m';
@@ -409,10 +425,9 @@ const templateHandlers = {
             text,
             options,
             correct: options.indexOf(correctStr),
-            rationale: `$R = \\dfrac{220}{${I}} = ${formatNumber(R)}\\Omega; \\ell = \\dfrac{R\\cdot S}{\\rho} = ${correctDisplay}\\text{ m}$`
+            rationale: `$R = \\dfrac{220}{${I}} = ${formatNumberMath(R)}\\Omega; \\ell = \\dfrac{R\\cdot ${formatNumberMath(S)}\\cdot10^{-6}}{${formatNumberMath(rho)}} = ${correctMath}\\text{ m}$`
         };
     },
-    // Q026 - SỬA: bọc formatScientific trong $...$
     rheostatMaxResistance: function() {
         const S = randomFromList([0.1,0.2,0.5]);
         const n = randomFromList([300,320,340,360,380,400]);
@@ -420,8 +435,9 @@ const templateHandlers = {
         const rho = 0.4e-6;
         const correct = rho * 3.14 * d * n * 10000 / S;
         const correctDisplay = formatNumber(correct);
-        const rhoDisplay = formatScientific(rho);
-        const text = `Dây điện trở của 1 biến trở con chạy được làm bằng hợp kim nikêlin có điện trở suất $\\rho = ${rhoDisplay}\\ \\Omega m$, tiết diện ${S} mm², quấn được ${n} vòng quanh một lõi sứ hình trụ đường kính ${d} cm. Tính điện trở lớn nhất của biến trở này.`;
+        const correctMath = formatNumberMath(correct);
+        const rhoDisplay = formatScientificDisplay(rho);
+        const text = `Dây điện trở của 1 biến trở con chạy được làm bằng hợp kim nikêlin có điện trở suất ${rhoDisplay} Ωm, tiết diện ${formatNumber(S)} mm², quấn được ${n} vòng quanh một lõi sứ hình trụ đường kính ${d} cm. Tính điện trở lớn nhất của biến trở này.`;
         const context = [S, n, d, rho];
         let options = generateDistractors(correct, 'Ω', 3, context);
         const correctStr = correctDisplay + ' Ω';
@@ -432,26 +448,24 @@ const templateHandlers = {
             text,
             options,
             correct: options.indexOf(correctStr),
-            rationale: `$\\ell = n\\pi d = ${(3.14*d*n).toFixed(0)}\\text{cm} = ${(3.14*d*n/100).toFixed(2)}\\text{m}; R = \\rho\\dfrac{\\ell}{S} = ${correctDisplay}\\ \\Omega$`
+            rationale: `$\\ell = n\\pi d = ${(3.14*d*n).toFixed(0)}\\text{cm} = ${(3.14*d*n/100).toFixed(2)}\\text{m}; R = \\rho\\dfrac{\\ell}{S} = ${correctMath}\\ \\Omega$`
         };
     },
-    // Q033
     seriesVoltage: function() {
         const R1 = randomFromList([2,4,6,8,10]);
         const R2 = R1 * 1.5;
         const I = randomFromList([0.1,0.2,0.4,0.5]);
         const U1 = R1 * I;
         const U2 = R2 * I;
-        const text = `Một mạch điện gồm hai điện trở ${R1} Ω và ${R2} Ω mắc nối tiếp, cường độ dòng điện chạy qua mạch là ${I} A. Xác định hiệu điện thế giữa hai đầu mỗi điện trở.`;
+        const text = `Một mạch điện gồm hai điện trở ${R1} Ω và ${formatNumber(R2)} Ω mắc nối tiếp, cường độ dòng điện chạy qua mạch là ${formatNumber(I)} A. Xác định hiệu điện thế giữa hai đầu mỗi điện trở.`;
         const options = [
             `U1 = ${formatNumber(U1)} V; U2 = ${formatNumber(U2)} V`,
             `U1 = ${formatNumber(U1*2)} V; U2 = ${formatNumber(U2*2)} V`,
             `U1 = ${formatNumber(U1/2)} V; U2 = ${formatNumber(U2/2)} V`,
             `U1 = ${formatNumber(U1+1)} V; U2 = ${formatNumber(U2+1)} V`
         ];
-        return { text, options, correct: 0, rationale: `$U_1 = R_1\\cdot I = ${R1} \\cdot ${I} = ${formatNumber(U1)}\\text{ V}; U_2 = ${R2} \\cdot ${I} = ${formatNumber(U2)}\\text{ V}$` };
+        return { text, options, correct: 0, rationale: `$U_1 = R_1\\cdot I = ${R1} \\cdot ${formatNumberMath(I)} = ${formatNumberMath(U1)}\\text{ V}; U_2 = ${formatNumberMath(R2)} \\cdot ${formatNumberMath(I)} = ${formatNumberMath(U2)}\\text{ V}$` };
     },
-    // Q035
     voltmeterSeries: function() {
         const I = randomFromList([2,3,6,8,10]);
         const U_AC = I * 6;
@@ -464,9 +478,8 @@ const templateHandlers = {
             `U_AC = ${formatNumber(U_AC/2)} V; U_AB = ${formatNumber(U_AB/2)} V; U_BC = ${formatNumber(U_BC/2)} V`,
             `U_AC = ${formatNumber(U_AC+1)} V; U_AB = ${formatNumber(U_AB+1)} V; U_BC = ${formatNumber(U_BC+1)} V`
         ];
-        return { text, options, correct: 0, rationale: `$U_{AC} = I\\cdot(R_1+R_2) = ${I}\\cdot6 = ${formatNumber(U_AC)}\\text{ V}; U_{AB}=${I}\\cdot5=${formatNumber(U_AB)}\\text{ V}; U_{BC}=${I}\\cdot1=${formatNumber(U_BC)}\\text{ V}$` };
+        return { text, options, correct: 0, rationale: `$U_{AC} = I\\cdot(R_1+R_2) = ${I}\\cdot6 = ${formatNumberMath(U_AC)}\\text{ V}; U_{AB}=${I}\\cdot5=${formatNumberMath(U_AB)}\\text{ V}; U_{BC}=${I}\\cdot1=${formatNumberMath(U_BC)}\\text{ V}$` };
     },
-    // Q036
     seriesCircuitAmmeter: function() {
         const R1 = randomFromList([5,10,15]);
         const R2 = 15;
@@ -474,16 +487,15 @@ const templateHandlers = {
         const U2 = randomFromList([1.5,3,4.5,6]);
         const I = U2 / R2;
         const U_AB = I * 40;
-        const text = `Ba điện trở R1 = ${R1} Ω, R2 = ${R2} Ω, R3 = ${R3} Ω được mắc vào mạch điện như Hình 12.2. Vôn kế chỉ ${U2} V. Xác định số chỉ của ampe kế và hiệu điện thế giữa hai điểm A và B.`;
+        const text = `Ba điện trở R1 = ${R1} Ω, R2 = ${R2} Ω, R3 = ${R3} Ω được mắc vào mạch điện như Hình 12.2. Vôn kế chỉ ${formatNumber(U2)} V. Xác định số chỉ của ampe kế và hiệu điện thế giữa hai điểm A và B.`;
         const options = [
             `I = ${formatNumber(I)} A; U_AB = ${formatNumber(U_AB)} V`,
             `I = ${formatNumber(I*2)} A; U_AB = ${formatNumber(U_AB*2)} V`,
             `I = ${formatNumber(I/2)} A; U_AB = ${formatNumber(U_AB/2)} V`,
             `I = ${formatNumber(I+0.1)} A; U_AB = ${formatNumber(U_AB+0.1)} V`
         ];
-        return { text, options, correct: 0, rationale: `$I = \\dfrac{U_2}{R_2} = \\dfrac{${U2}}{${R2}} = ${formatNumber(I)}\\text{ A}; U_{AB} = I\\cdot 40 = ${formatNumber(U_AB)}\\text{ V}$` };
+        return { text, options, correct: 0, rationale: `$I = \\dfrac{${formatNumberMath(U2)}}{${R2}} = ${formatNumberMath(I)}\\text{ A}; U_{AB} = I\\cdot 40 = ${formatNumberMath(U_AB)}\\text{ V}$` };
     },
-    // Q037
     lampVoltageSeries: function() {
         const U = randomFromList([1,2,3,4,5,6,7,8,9]);
         const text = `Cho sơ đồ mạch điện như Hình 12.3. Hiệu điện thế giữa hai đầu bóng đèn là bao nhiêu nếu điện trở của đèn lớn gấp hai lần điện trở R? Biết số chỉ của vôn kế là ${U} V.`;
@@ -493,9 +505,8 @@ const templateHandlers = {
             `${formatNumber(U/2)} V`,
             `${formatNumber(U*3)} V`
         ];
-        return { text, options, correct: 0, rationale: `$U_{đèn} = I\\cdot R_{đèn} = \\dfrac{${U}}{R}\\cdot 2R = ${U*2}\\text{ V}$` };
+        return { text, options, correct: 0, rationale: `$U_{đèn} = I\\cdot R_{đèn} = \\dfrac{${U}}{R}\\cdot 2R = ${formatNumberMath(U*2)}\\text{ V}$` };
     },
-    // Q042
     parallelAmmeter: function() {
         const R2 = randomFromList([3,6,12,15]);
         const R1 = R2 * 2;
@@ -512,26 +523,24 @@ const templateHandlers = {
             text,
             options,
             correct: options.indexOf(correctStr),
-            rationale: `$I_1 = \\dfrac{U}{R_1} = \\dfrac{${U}}{${R1}} = ${formatNumber(I1)}\\text{ A}$`
+            rationale: `$I_1 = \\dfrac{${U}}{${R1}} = ${formatNumberMath(I1)}\\text{ A}$`
         };
     },
-    // Q043
     parallelCircuit: function() {
         const Itd = randomFromList([5.5,11,22]);
         const R1 = 110;
         const I1 = 220 / R1;
         const I2 = Itd - I1;
         const R2 = 220 / I2;
-        const text = `Có sơ đồ mạch điện như Hình 12.6. Ampe kế A chỉ ${Itd} A, vôn kế V chỉ 220 V. Điện trở R1 = 110 Ω. Xác định giá trị R2 và số chỉ của các ampe kế A1, A2.`;
+        const text = `Có sơ đồ mạch điện như Hình 12.6. Ampe kế A chỉ ${formatNumber(Itd)} A, vôn kế V chỉ 220 V. Điện trở R1 = 110 Ω. Xác định giá trị R2 và số chỉ của các ampe kế A1, A2.`;
         const options = [
             `R2 = ${formatNumber(R2)} Ω; I1 = ${formatNumber(I1)} A; I2 = ${formatNumber(I2)} A`,
             `R2 = ${formatNumber(R2*2)} Ω; I1 = ${formatNumber(I1*2)} A; I2 = ${formatNumber(I2*2)} A`,
             `R2 = ${formatNumber(R2/2)} Ω; I1 = ${formatNumber(I1/2)} A; I2 = ${formatNumber(I2/2)} A`,
             `R2 = ${formatNumber(R2+1)} Ω; I1 = ${formatNumber(I1+1)} A; I2 = ${formatNumber(I2+1)} A`
         ];
-        return { text, options, correct: 0, rationale: `$I_1 = \\dfrac{220}{110}=${formatNumber(I1)}\\text{ A}; I_2 = ${Itd} - ${formatNumber(I1)} = ${formatNumber(I2)}\\text{ A}; R_2 = \\dfrac{220}{${formatNumber(I2)}} = ${formatNumber(R2)}\\ \\Omega$` };
+        return { text, options, correct: 0, rationale: `$I_1 = \\dfrac{220}{110}=${formatNumberMath(I1)}\\text{ A}; I_2 = ${formatNumberMath(Itd)} - ${formatNumberMath(I1)} = ${formatNumberMath(I2)}\\text{ A}; R_2 = \\dfrac{220}{${formatNumberMath(I2)}} = ${formatNumberMath(R2)}\\ \\Omega$` };
     },
-    // Q048
     switchResistance: function() {
         const R1 = randomFromList([1,2,3,4,5,6,7,8]);
         const R2 = 9 - R1;
@@ -550,7 +559,6 @@ const templateHandlers = {
             rationale: `Khi K đóng: $I_1 = \\dfrac{U}{9}$; K mở: $I_2 = \\dfrac{U}{9+R_3}$; $\\dfrac{I_1}{I_2} = 3 \\Rightarrow R_3 = 18\\ \\Omega$`
         };
     },
-    // Q049
     threeResistorsSwitch: function() {
         const n = randomFromList([2,3,4,5]);
         const m = n + randomFromList([2,3,4,5]);
@@ -564,9 +572,8 @@ const templateHandlers = {
             `R2 = ${formatNumber(R2/2)} Ω; R3 = ${formatNumber(R3/2)} Ω`,
             `R2 = ${formatNumber(R2+1)} Ω; R3 = ${formatNumber(R3+1)} Ω`
         ];
-        return { text, options, correct: 0, rationale: `$R_2 = R_1(${n}-1) = ${formatNumber(R2)}\\Omega; R_3 = R_1(${m}-${n}) = ${formatNumber(R3)}\\Omega$` };
+        return { text, options, correct: 0, rationale: `$R_2 = R_1(${n}-1) = ${formatNumberMath(R2)}\\Omega; R_3 = R_1(${m}-${n}) = ${formatNumberMath(R3)}\\Omega$` };
     },
-    // Q054
     bulbPowerResistanceEnergy: function() {
         const P = randomFromList([3,6,12]);
         const n = randomFromList([1,2,3,4,5]);
@@ -579,9 +586,8 @@ const templateHandlers = {
             `R = ${formatNumber(R/2)} Ω; A = ${formatNumber(A/2)} J`,
             `R = ${formatNumber(R+1)} Ω; A = ${formatNumber(A+1)} J`
         ];
-        return { text, options, correct: 0, rationale: `$R = \\dfrac{12^2}{${P}} = ${formatNumber(R)}\\Omega; A = ${P} \\cdot ${n} = ${formatNumber(A)}\\text{ J}$` };
+        return { text, options, correct: 0, rationale: `$R = \\dfrac{12^2}{${P}} = ${formatNumberMath(R)}\\Omega; A = ${P} \\cdot ${n} = ${formatNumberMath(A)}\\text{ J}$` };
     },
-    // Q055
     energyConsumptionBulb: function() {
         const n = randomFromList([1,2,3,4,5,6,7,8,9]);
         const correct = n * 3;
@@ -592,9 +598,8 @@ const templateHandlers = {
             `${n*n*90} kW.h`,
             `${n*n*2700} kW.h`
         ];
-        return { text, options, correct: 0, rationale: `$A = 100\\cdot ${n}\\cdot 30 = ${correct}\\text{ kW.h}$` };
+        return { text, options, correct: 0, rationale: `$A = 100\\cdot ${n}\\cdot 30 = ${formatNumberMath(correct)}\\text{ kW.h}$` };
     },
-    // Q057
     energySeriesParallel: function() {
         const R = randomFromList([1,2,4,5,8,10]);
         const text = `Hai đoạn dây dẫn, mỗi đoạn có điện trở ${R} Ω. Ban đầu hai điện trở mắc nối tiếp, sau đó được mắc song song. Trong cả hai trường hợp đều mắc đoạn mạch vào hiệu điện thế 4 V. Xét trong cùng một thời gian, với trường hợp nào thì điện năng tiêu thụ lớn hơn và lớn hơn bao nhiêu lần?`;
@@ -606,7 +611,6 @@ const templateHandlers = {
         ];
         return { text, options, correct: 0, rationale: `$A_{//} = \\dfrac{U^2}{R/2}t = 2\\dfrac{U^2}{R}t; A_{nt} = \\dfrac{U^2}{2R}t; \\dfrac{A_{//}}{A_{nt}} = 4$` };
     },
-    // Q067
     ironPowerCurrentResistance: function() {
         const A = randomFromList([396,693,990,1386]);
         const P = A * 10 / 9;
@@ -619,9 +623,8 @@ const templateHandlers = {
             `𝒫 = ${formatNumber(P/2)} W; I = ${formatNumber(I/2)} A; R = ${formatNumber(R/2)} Ω`,
             `𝒫 = ${formatNumber(P+1)} W; I = ${formatNumber(I+1)} A; R = ${formatNumber(R+1)} Ω`
         ];
-        return { text, options, correct: 0, rationale: `$\\mathcal{P} = \\dfrac{${A}\\cdot1000}{900} = ${formatNumber(P)}\\text{ W}; I = \\dfrac{\\mathcal{P}}{220} = ${formatNumber(I)}\\text{ A}; R = \\dfrac{220^2}{\\mathcal{P}} = ${formatNumber(R)}\\Omega$` };
+        return { text, options, correct: 0, rationale: `$\\mathcal{P} = \\dfrac{${A}\\cdot1000}{900} = ${formatNumberMath(P)}\\text{ W}; I = \\dfrac{\\mathcal{P}}{220} = ${formatNumberMath(I)}\\text{ A}; R = \\dfrac{220^2}{\\mathcal{P}} = ${formatNumberMath(R)}\\Omega$` };
     },
-    // Q071
     energySavedByLED: function() {
         const n = randomFromList([1,2,3,4,5,6,7,8,9]);
         const correct = 48 * n * 3600;
@@ -636,10 +639,9 @@ const templateHandlers = {
             text,
             options,
             correct: options.indexOf(correctStr),
-            rationale: `$A = (60-12)\\cdot ${n}\\cdot3600 = ${formatNumber(correct)}\\text{ J}$`
+            rationale: `$A = (60-12)\\cdot ${n}\\cdot3600 = ${formatNumberMath(correct)}\\text{ J}$`
         };
     },
-    // Q075
     energyChangeResistance: function() {
         const n = randomFromList([2,3,4,5,6,7,8,9]);
         const text = `Cho đoạn mạch có hiệu điện thế hai đầu không đổi, khi điện trở trong mạch được điều chỉnh tăng ${n} lần thì trong cùng khoảng thời gian, năng lượng tiêu thụ của mạch thay đổi như thế nào?`;
@@ -651,7 +653,6 @@ const templateHandlers = {
         ];
         return { text, options, correct: 0, rationale: `$A = \\dfrac{U^2}{R}t$, khi R tăng ${n}$ lần thì A giảm ${n}$ lần.` };
     },
-    // Q106
     frequencyChangeCount: function() {
         const f = randomFromList([30,40,50,60]);
         const correct = 2 * f;
@@ -666,15 +667,14 @@ const templateHandlers = {
             text,
             options,
             correct: options.indexOf(correctStr),
-            rationale: `Trong 1 chu kỳ đổi chiều 2 lần, nên trong 1 giây đổi chiều $2\\cdot${f} = ${formatNumber(correct)}$ lần.`
+            rationale: `Trong 1 chu kỳ đổi chiều 2 lần, nên trong 1 giây đổi chiều $2\\cdot${f} = ${formatNumberMath(correct)}$ lần.`
         };
     },
-    // Q151
     solarPanelArea: function() {
         const Pd = randomFromList([100,200,300]);
         const Pt = Pd * 7/10;
         const correct = (Pd*20 + Pt*10) / 1400;
-        const text = `Những ngày trời nắng không có mây, bề mặt có diện tích 1m² của tấm pin mặt trời để ngoài nắng nhận được một năng lượng mặt trời là 1400 J trong 1s. Hỏi cần phủ lên mái nhà một tấm pin mặt trời có diện tích tối thiểu là bao nhiêu để có đủ điện thắp sáng hai bóng đèn có công suất ${Pd} W và một máy thu hình ${Pt} W. Biết hiệu suất của pin mặt trời là 10%.`;
+        const text = `Những ngày trời nắng không có mây, bề mặt có diện tích 1m² của tấm pin mặt trời để ngoài nắng nhận được một năng lượng mặt trời là 1400 J trong 1s. Hỏi cần phủ lên mái nhà một tấm pin mặt trời có diện tích tối thiểu là bao nhiêu để có đủ điện thắp sáng hai bóng đèn có công suất ${Pd} W và một máy thu hình ${formatNumber(Pt)} W. Biết hiệu suất của pin mặt trời là 10%.`;
         const context = [Pd, Pt];
         let options = generateDistractors(correct, 'm²', 3, context);
         const correctStr = formatNumber(correct) + ' m²';
@@ -685,7 +685,7 @@ const templateHandlers = {
             text,
             options,
             correct: options.indexOf(correctStr),
-            rationale: `$A_{cần} = \\dfrac{2\\cdot${Pd}+${Pt}}{0.1} = ${formatNumber(correct)}\\text{ m}^2$`
+            rationale: `$A_{cần} = \\dfrac{2\\cdot${Pd}+${formatNumberMath(Pt)}}{0.1} = ${formatNumberMath(correct)}\\text{ m}^2$`
         };
     }
 };
